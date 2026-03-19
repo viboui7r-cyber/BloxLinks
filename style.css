@@ -1,0 +1,93 @@
+body {
+    margin: 0;
+    background: black;
+    font-family: monospace;
+    color: #c084fc;
+}
+
+/* screens */
+.screen {
+    display: none;
+    height: 100vh;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+.screen.active {
+    display: flex;
+}
+
+/* MENU */
+.title {
+    font-size: 60px;
+    text-shadow: 0 0 20px purple;
+}
+.subtitle {
+    margin-bottom: 40px;
+}
+
+.menu-panels {
+    display: flex;
+    gap: 40px;
+}
+
+.panel {
+    background: #120018;
+    padding: 20px;
+    border: 1px solid purple;
+}
+
+.start-text {
+    margin-top: 40px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0.3; }
+}
+
+/* GAME */
+.hud {
+    width: 90%;
+    display: flex;
+    justify-content: space-between;
+    margin: 10px auto;
+    align-items: center;
+}
+
+.health-bar {
+    width: 200px;
+}
+
+.bar {
+    background: #222;
+    height: 15px;
+}
+
+.bar div {
+    height: 100%;
+    background: lime;
+}
+
+#timer {
+    font-size: 30px;
+}
+
+canvas {
+    background: radial-gradient(#0a0015, #000);
+    border: 2px solid purple;
+}
+
+/* abilities */
+.abilities {
+    width: 90%;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+.abilities span {
+    border: 1px solid cyan;
+    padding: 10px;
+    margin: 5px;
+}

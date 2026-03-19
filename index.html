@@ -1,148 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Cursed Clash</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Cursed Clash</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ================= MENU ================= -->
-<div id="menuScreen" class="screen active">
-    <h1 class="title">CURSED CLASH</h1>
-    <p class="subtitle">JUJUTSU KAISEN</p>
-
-    <div class="menu-panels">
-        <div class="panel">
-            <h2>PLAYER 1 — YUJI</h2>
-            <p>W → Jump</p>
-            <p>A / D → Move</p>
-            <p>F → Punch</p>
-            <p>G → Heavy</p>
-            <p>H → Black Flash</p>
-        </div>
-
-        <div class="panel">
-            <h2>PLAYER 2 — GOJO</h2>
-            <p>↑ → Jump</p>
-            <p>← / → → Move</p>
-            <p>K → Punch</p>
-            <p>L → Blue</p>
-            <p>; → Purple</p>
-        </div>
+<div class="hud">
+    <div class="player">
+        <span id="p1Text">YUJI 100</span>
+        <div class="bar"><div id="p1Bar"></div></div>
     </div>
 
-    <p class="start-text">PRESS ENTER TO START</p>
+    <div id="timer">60</div>
+
+    <div class="player">
+        <span id="p2Text">GOJO 100</span>
+        <div class="bar"><div id="p2Bar"></div></div>
+    </div>
 </div>
 
-<!-- ================= GAME ================= -->
-<div id="gameScreen" class="screen">
-    
-    <div class="hud">
-        <div class="health-bar">
-            <span>YUJI</span>
-            <div class="bar"><div id="p1Health"></div></div>
-        </div>
+<canvas id="game" width="900" height="400"></canvas>
 
-        <div id="timer">60</div>
-
-        <div class="health-bar">
-            <span>GOJO</span>
-            <div class="bar"><div id="p2Health"></div></div>
-        </div>
-    </div>
-
-    <canvas id="canvas" width="900" height="400"></canvas>
-
-    <!-- Ability UI -->
-    <div class="abilities">
-        <div class="p1-abilities">
-            <span>F</span><span>G</span><span>H</span>
-        </div>
-        <div class="p2-abilities">
-            <span>K</span><span>L</span><span>;</span>
-        </div>
-    </div>
-
+<div class="skills">
+    <div>F G H</div>
+    <div>K L ;</div>
 </div>
+
+<script src="sprites.js"></script>
 
 <script>
-const menu = document.getElementById("menuScreen");
-const game = document.getElementById("gameScreen");
-
-window.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        menu.classList.remove("active");
-        game.classList.add("active");
-        startGame();
-    }
-});
-
-/* ================= GAME ================= */
-
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let p1 = { x:100, y:300, health:100, color:"#ff4d6d" };
-let p2 = { x:700, y:300, health:100, color:"#4d9aff" };
+/* ================= GAME STATE ================= */
+let timer = 60;
+let hitFlash = 0;
+let shake = 0;
+
+let p1 = { x:100, y:250, health:100, dir:1 };
+let p2 = { x:700, y:250, health:100, dir:-1 };
 
 let keys = {};
+let projectiles = [];
 
-window.addEventListener("keydown", e => keys[e.key] = true);
-window.addEventListener("keyup", e => keys[e.key] = false);
+/* ================= INPUT ================= */
+window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-function update() {
-    // movement
-    if(keys["a"]) p1.x -= 4;
-    if(keys["d"]) p1.x += 4;
+/* ================= TIMER ================= */
+setInterval(()=>{
+    if(timer > 0) timer--;
+    document.getElementById("timer").innerText = timer;
+},1000);
 
-    if(keys["ArrowLeft"]) p2.x -= 4;
-    if(keys["ArrowRight"]) p2.x += 4;
-
-    // attacks
-    if(keys["f"]) attack(p1, p2);
-    if(keys["k"]) attack(p2, p1);
-
-    updateHealth();
+/* ================= BACKGROUND ================= */
+let stars = [];
+for(let i=0;i<80;i++){
+    stars.push({
+        x: Math.random()*900,
+        y: Math.random()*400,
+        speed: Math.random()*0.5 + 0.2
+    });
 }
 
-function attack(attacker, defender){
-    if(Math.abs(attacker.x - defender.x) < 60){
-        defender.health -= 0.5;
+function drawBackground(){
+    ctx.fillStyle = "#050010";
+    ctx.fillRect(0,0,900,400);
+
+    ctx.fillStyle = "white";
+    stars.forEach(s=>{
+        s.y += s.speed;
+        if(s.y > 400) s.y = 0;
+        ctx.fillRect(s.x, s.y, 2,2);
+    });
+}
+
+/* ================= SPRITES ================= */
+function drawSprite(sprite, x, y, scale=5){
+    for(let r=0;r<sprite.length;r++){
+        for(let c=0;c<sprite[r].length;c++){
+            let pixel = sprite[r][c];
+            if(pixel !== 0){
+                ctx.fillStyle = COLORS[pixel];
+                ctx.fillRect(x + c*scale, y + r*scale, scale, scale);
+            }
+        }
     }
 }
 
-function updateHealth(){
-    document.getElementById("p1Health").style.width = p1.health + "%";
-    document.getElementById("p2Health").style.width = p2.health + "%";
+function drawPlayer(p, type){
+    if(type === "yuji") drawSprite(YUJI_IDLE, p.x, p.y);
+    if(type === "gojo") drawSprite(GOJO_IDLE, p.x, p.y);
 }
 
-function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+/* ================= MOVEMENT ================= */
+function move(){
+    if(keys["a"]) { p1.x -= 3; p1.dir = -1; }
+    if(keys["d"]) { p1.x += 3; p1.dir = 1; }
 
-    // background stars
-    for(let i=0;i<50;i++){
-        ctx.fillStyle="white";
-        ctx.fillRect(Math.random()*900, Math.random()*400, 1,1);
+    if(keys["arrowleft"]) { p2.x -= 3; p2.dir = -1; }
+    if(keys["arrowright"]) { p2.x += 3; p2.dir = 1; }
+}
+
+/* ================= SKILLS ================= */
+
+// Yuji
+function divergentFist(){
+    if(Math.abs(p1.x - p2.x) < 80){
+        p2.health -= 2;
+        hitFlash = 3;
     }
-
-    // players
-    ctx.fillStyle = p1.color;
-    ctx.fillRect(p1.x, p1.y, 40, 80);
-
-    ctx.fillStyle = p2.color;
-    ctx.fillRect(p2.x, p2.y, 40, 80);
 }
 
-function gameLoop(){
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
+function blackFlash(){
+    if(Math.abs(p1.x - p2.x) < 80){
+        p2.health -= 8;
+        shake = 8;
+        hitFlash = 6;
+    }
 }
 
-function startGame(){
-    gameLoop();
+function rush(){
+    p1.x += p1.dir * 40;
 }
+
+// Gojo
+function redBall(){
+    projectiles.push({
+        x:p2.x,
+        y:p2.y,
+        vx:-6,
+        color:"red",
+        size:8,
+        damage:3
+    });
+}
+
+function blueOrb(){
+    projectiles.push({
+        x:p2.x,
+        y:p2.y,
+        vx:0,
+        color:"cyan",
+        size:25,
+        damage:5
+    });
+}
+
+function purple(){
+    projectiles.push({
+        x:p2.x,
+        y:p2.y,
+        vx:-8,
+        color:"purple",
+        size:18,
+        damage:12
+    });
+}
+
+/* ================= INPUT SKILLS ================= */
+function handleSkills(){
+    if(keys["f"]) divergentFist();
+    if(keys["g"]) blackFlash();
+    if(keys["h"]) rush();
+
+    if(keys["k"]) redBall();
+    if(keys["l"]) blueOrb();
+    if(keys[";"]) purple();
+}
+
+/* ================= PROJECTILES ================= */
+function updateProjectiles(){
+    projectiles.forEach(p=>{
+        p.x += p.vx;
+
+        if(Math.abs(p.x - p1.x) < 30){
+            p1.health -= p.damage;
+            hitFlash = 4;
+            shake = 4;
+        }
+    });
+
+    projectiles = projectiles.filter(p => p.x > 0 && p.x < 900);
+}
+
+function drawProjectiles(){
+    projectiles.forEach(p=>{
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = p.color;
+
+        ctx.fillStyle = p.color;
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+    });
+}
+
+/* ================= EFFECTS ================= */
+function applyShake(){
+    if(shake > 0){
+        ctx.translate(Math.random()*6-3, Math.random()*6-3);
+        shake--;
+    }
+}
+
+function hitEffect(){
+    if(hitFlash > 0){
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.fillRect(0,0,900,400);
+        hitFlash--;
+    }
+}
+
+/* ================= UI ================= */
+function updateUI(){
+    document.getElementById("p1Bar").style.width = p1.health + "%";
+    document.getElementById("p2Bar").style.width = p2.health + "%";
+
+    document.getElementById("p1Text").innerText = "YUJI " + Math.floor(p1.health);
+    document.getElementById("p2Text").innerText = "GOJO " + Math.floor(p2.health);
+}
+
+/* ================= GAME LOOP ================= */
+function loop(){
+    ctx.save();
+
+    applyShake();
+
+    drawBackground();
+    move();
+    handleSkills();
+    updateProjectiles();
+
+    drawPlayer(p1,"yuji");
+    drawPlayer(p2,"gojo");
+    drawProjectiles();
+
+    hitEffect();
+
+    ctx.restore();
+
+    updateUI();
+
+    requestAnimationFrame(loop);
+}
+
+loop();
 </script>
 
 </body>

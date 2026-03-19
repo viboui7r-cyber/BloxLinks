@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D FIGHTER · one‑file arena</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #0b0f1c;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            margin: 0;
+            padding: 16px;
+        }
+        .game-wrapper {
+            background: #1e1e30;
+            border-radius: 2rem;
+            padding: 1.5rem 1.5rem 2rem;
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.7), inset 0 0 8px #4e3b6e;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 28px;
+            background: radial-gradient(circle at 50% 30%, #5f4b7a, #2a1f3a);
+            box-shadow: 0 0 0 3px #b48cff, 0 15px 25px black;
+            cursor: none;
+        }
+        .hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 8px 10px 8px;
+            color: #f0e9ff;
+            text-shadow: 2px 2px 0 #1f1235;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .health-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            background: #2d2342;
+            padding: 8px 24px;
+            border-radius: 60px;
+            border: 2px solid #ae92e6;
+            box-shadow: inset 0 3px 6px #0b0820;
+        }
+        .health-bar-bg {
+            width: 200px;
+            height: 22px;
+            background: #3a2a4a;
+            border-radius: 40px;
+            border: 2px solid #170f27;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px black;
+        }
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.1s ease;
+        }
+        .p1-health {
+            background: linear-gradient(90deg, #ff8866, #ff3a2f);
+            box-shadow: 0 0 12px #ff6a4b;
+        }
+        .p2-health {
+            background: linear-gradient(90deg, #44aaff, #2255ee);
+            box-shadow: 0 0 12px #3f96ff;
+        }
+        .vs-badge {
+            font-size: 2rem;
+            font-weight: 900;
+            background: #241b33;
+            padding: 0 16px;
+            border-radius: 60px;
+            border: 2px solid #d2abff;
+            color: #f2d9ff;
+            line-height: 1.4;
+            letter-spacing: 2px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            color: #cbb7fa;
+            background: #19152b;
+            padding: 12px 20px;
+            border-radius: 60px;
+            margin-top: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid #765fa8;
+        }
+        button {
+            background: #be9eff;
+            border: none;
+            color: #1e132b;
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 10px 36px;
+            border-radius: 60px;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 0 #4d3575, 0 8px 12px black;
+            cursor: pointer;
+            transition: 0.07s;
+            border: 2px solid #e9ceff;
+            margin-top: 15px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        button:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #3f2b60, 0 5px 12px black;
+        }
+        .winner-message {
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: #ffd966;
+            color: #220d34;
+            display: inline-block;
+            padding: 6px 32px;
+            border-radius: 60px;
+            border: 4px solid #9147ff;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <canvas id="fightCanvas" width="800" height="400"></canvas>
+
+        <div class="hud">
+            <div class="health-container">
+                <span>⚡ P1</span>
+                <div class="health-bar-bg">
+                    <div id="p1HealthFill" class="health-fill p1-health" style="width: 100%;"></div>
+                </div>
+            </div>
+            <div class="vs-badge">⚔️ VS ⚔️</div>
+            <div class="health-container">
+                <div class="health-bar-bg">
+                    <div id="p2HealthFill" class="health-fill p2-health" style="width: 100%;"></div>
+                </div>
+                <span>P2 💢</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <span>🟥 P1: A / D  |  F (punch)</span>
+            <span style="color:#b5a0ff;">✦ ROUND ✦</span>
+            <span>🟦 P2: ← / →  |  ↓ (punch)</span>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 25px; align-items: center;">
+            <div id="winnerDisplay" class="winner-message" style="display: none;">WINNER</div>
+            <button id="resetButton">💥 RESFIGHT 💥</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- canvas ----------
+            const canvas = document.getElementById('fightCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // ---------- DOM elements ----------
+            const p1HealthFill = document.getElementById('p1HealthFill');
+            const p2HealthFill = document.getElementById('p2HealthFill');
+            const winnerDiv = document.getElementById('winnerDisplay');
+
+            // ---------- constants ----------
+            const GROUND_Y = 300;               // where feet stand
+            const CHAR_WIDTH = 44;
+            const CHAR_HEIGHT = 80;
+            const PLAYER_Y = GROUND_Y - CHAR_HEIGHT;  // = 220
+
+            const MOVE_SPEED = 220;              // pixels per second
+            const ATTACK_RANGE = 68;              // center-distance threshold
+            const ATTACK_DAMAGE = 11;
+
+            const ATTACK_DURATION = 0.22;          // seconds (hit active)
+            const ATTACK_COOLDOWN = 0.45;           // seconds before next attack
+
+            // ---------- player objects ----------
+            let p1 = {
+                x: 120, y: PLAYER_Y,
+                w: CHAR_WIDTH, h: CHAR_HEIGHT,
+                health: 100,
+                face: 1,                           // 1 = right, -1 = left
+                attackTimer: 0,
+                cooldownTimer: 0,
+                hitDelivered: false,
+            };
+            let p2 = {
+                x: 800 - 120 - CHAR_WIDTH, y: PLAYER_Y,
+                w: CHAR_WIDTH, h: CHAR_HEIGHT,
+                health: 100,
+                face: -1,                          // starts facing left
+                attackTimer: 0,
+                cooldownTimer: 0,
+                hitDelivered: false,
+            };
+
+            // ---------- game state ----------
+            let gameActive = true;
+            let winnerText = '';
+
+            // ---------- key state (movement + attack flags) ----------
+            const key = {
+                p1Left: false,
+                p1Right: false,
+                p1Attack: false,    // to avoid rapid fire while holding F
+                p2Left: false,
+                p2Right: false,
+                p2Attack: false,
+            };
+
+            // ---------- reset fight ----------
+            function resetFight() {
+                gameActive = true;
+                winnerText = '';
+                winnerDiv.style.display = 'none';
+                p1 = { ...p1,
+                    x: 120, y: PLAYER_Y, w: CHAR_WIDTH, h: CHAR_HEIGHT,
+                    health: 100, face: 1,
+                    attackTimer: 0, cooldownTimer: 0, hitDelivered: false,
+                };
+                p2 = { ...p2,
+                    x: 800 - 120 - CHAR_WIDTH, y: PLAYER_Y, w: CHAR_WIDTH, h: CHAR_HEIGHT,
+                    health: 100, face: -1,
+                    attackTimer: 0, cooldownTimer: 0, hitDelivered: false,
+                };
+                // reset key toggles (avoid stuck keys)
+                key.p1Left = false;
+                key.p1Right = false;
+                key.p1Attack = false;
+                key.p2Left = false;
+                key.p2Right = false;
+                key.p2Attack = false;
+
+                updateHealthBars();
+            }
+
+            // ---------- health bar update ----------
+            function updateHealthBars() {
+                p1HealthFill.style.width = Math.max(0, p1.health) + '%';
+                p2HealthFill.style.width = Math.max(0, p2.health) + '%';
+            }
+
+            // ---------- check win condition ----------
+            function checkVictory() {
+                if (!gameActive) return true;
+                if (p1.health <= 0) {
+                    gameActive = false;
+                    winnerText = 'P 2  W I N S !';
+                    winnerDiv.style.display = 'inline-block';
+                    winnerDiv.innerText = '👑 P2 WIN 👑';
+                    return true;
+                }
+                if (p2.health <= 0) {
+                    gameActive = false;
+                    winnerText = 'P 1  W I N S !';
+                    winnerDiv.style.display = 'inline-block';
+                    winnerDiv.innerText = '👑 P1 WIN 👑';
+                    return true;
+                }
+                return false;
+            }
+
+            // ---------- push apart when overlapping (simple) ----------
+            function resolveCollision() {
+                const p1Center = p1.x + p1.w/2;
+                const p2Center = p2.x + p2.w/2;
+                const halfWidths = (p1.w + p2.w) / 2;
+                const dist = Math.abs(p1Center - p2Center);
+                if (dist < halfWidths) { // overlap
+                    const overlap = halfWidths - dist;
+                    const dir = p1Center < p2Center ? 1 : -1;
+                    // push both equally, but keep inside boundaries
+                    let push1 = -dir * overlap / 2;
+                    let push2 = dir * overlap / 2;
+
+                    let newX1 = p1.x + push1;
+                    let newX2 = p2.x + push2;
+
+                    // boundary constraints
+                    if (newX1 < 0) {
+                        newX1 = 0;
+                        newX2 = p2.x + (p1.x - 0); // adjust second accordingly (optional)
+                    }
+                    if (newX1 + p1.w > 800) {
+                        newX1 = 800 - p1.w;
+                        newX2 = p2.x + (p1.x - newX1);
+                    }
+                    if (newX2 < 0) {
+                        newX2 = 0;
+                        newX1 = p1.x + (p2.x - 0);
+                    }
+                    if (newX2 + p2.w > 800) {
+                        newX2 = 800 - p2.w;
+                        newX1 = p1.x + (p2.x - newX2);
+                    }
+
+                    p1.x = newX1;
+                    p2.x = newX2;
+                }
+            }
+
+            // ---------- attack logic (triggered by keydown) ----------
+            function tryAttack(player, enemy, playerId) {
+                if (!gameActive) return false;
+                // cooldown check
+                if (player.cooldownTimer > 0) return false;
+
+                // start attack
+                player.attackTimer = ATTACK_DURATION;
+                player.cooldownTimer = ATTACK_COOLDOWN;
+                player.hitDelivered = false;   // fresh hit flag
+                return true;
+            }
+
+            // ---------- process hits during attack window ----------
+            function processHit(attacker, defender) {
+                if (attacker.attackTimer <= 0) return;
+                if (attacker.hitDelivered) return; // already hit with this attack
+
+                const attCenter = attacker.x + attacker.w/2;
+                const defCenter = defender.x + defender.w/2;
+                const dist = Math.abs(attCenter - defCenter);
+
+                // facing check: attacker.face direction vs relative position
+                let facingCondition = false;
+                if (attacker.face === 1 && defCenter > attCenter) facingCondition = true;
+                if (attacker.face === -1 && defCenter < attCenter) facingCondition = true;
+
+                if (facingCondition && dist < ATTACK_RANGE) {
+                    // HIT!
+                    defender.health = Math.max(0, defender.health - ATTACK_DAMAGE);
+                    attacker.hitDelivered = true;
+                    updateHealthBars();
+
+                    // tiny knockback (optional)
+                    const pushDir = attacker.face;
+                    defender.x += pushDir * 12;
+                    attacker.x -= pushDir * 6;  // slight recoil
+
+                    // boundary clamp
+                    defender.x = Math.max(0, Math.min(800 - defender.w, defender.x));
+                    attacker.x = Math.max(0, Math.min(800 - attacker.w, attacker.x));
+
+                    checkVictory();
+                }
+            }
+
+            // ---------- update timers (delta seconds) ----------
+            function updateTimers(dt) {
+                if (!gameActive) return;  // freeze timers when game over
+
+                // p1 timers
+                if (p1.attackTimer > 0) p1.attackTimer = Math.max(0, p1.attackTimer - dt);
+                if (p1.cooldownTimer > 0) p1.cooldownTimer = Math.max(0, p1.cooldownTimer - dt);
+
+                // p2 timers
+                if (p2.attackTimer > 0) p2.attackTimer = Math.max(0, p2.attackTimer - dt);
+                if (p2.cooldownTimer > 0) p2.cooldownTimer = Math.max(0, p2.cooldownTimer - dt);
+            }
+
+            // ---------- movement based on keys ----------
+            function updateMovement(dt) {
+                if (!gameActive) return;
+
+                // player 1 (A / D)
+                if (key.p1Left) {
+                    p1.x -= MOVE_SPEED * dt;
+                    p1.face = -1;
+                }
+                if (key.p1Right) {
+                    p1.x += MOVE_SPEED * dt;
+                    p1.face = 1;
+                }
+
+                // player 2 (arrow left/right)
+                if (key.p2Left) {
+                    p2.x -= MOVE_SPEED * dt;
+                    p2.face = -1;
+                }
+                if (key.p2Right) {
+                    p2.x += MOVE_SPEED * dt;
+                    p2.face = 1;
+                }
+
+                // boundaries
+                p1.x = Math.max(0, Math.min(800 - p1.w, p1.x));
+                p2.x = Math.max(0, Math.min(800 - p2.w, p2.x));
+            }
+
+            // ---------- drawing ----------
+            function drawScene() {
+                ctx.clearRect(0, 0, 800, 400);
+
+                // ground line
+                ctx.fillStyle = '#392d4b';
+                ctx.fillRect(0, GROUND_Y, 800, 12);
+                ctx.fillStyle = '#644f82';
+                ctx.fillRect(0, GROUND_Y+4, 800, 4);
+
+                // draw both fighters
+                drawFighter(p1, '#f94a3b', '#ffb07c', '#a32020');
+                drawFighter(p2, '#3f8ef0', '#9aceff', '#1049a9');
+
+                // attack glows / indicators
+                if (p1.attackTimer > 0) {
+                    ctx.shadowColor = '#ffaa33';
+                    ctx.shadowBlur = 28;
+                }
+                if (p2.attackTimer > 0) {
+                    ctx.shadowColor = '#ffea80';
+                    ctx.shadowBlur = 28;
+                }
+                // reset shadow
+                ctx.shadowBlur = 0;
+
+                // draw face indicators (tiny eyes)
+                ctx.font = 'bold 26px monospace';
+                ctx.fillStyle = 'white';
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 8;
+                if (p1.face === 1) ctx.fillText('▶', p1.x + p1.w-20, p1.y+35);
+                else ctx.fillText('◀', p1.x+5, p1.y+35);
+                if (p2.face === 1) ctx.fillText('▶', p2.x + p2.w-20, p2.y+35);
+                else ctx.fillText('◀', p2.x+5, p2.y+35);
+                ctx.shadowBlur = 0;
+            }
+
+            function drawFighter(p, darkColor, lightColor, strokeColor) {
+                // body
+                ctx.fillStyle = darkColor;
+                ctx.shadowBlur = 16;
+                ctx.shadowColor = 'rgba(255,180,200,0.5)';
+                ctx.beginPath();
+                ctx.roundRect(p.x, p.y, p.w, p.h, 16);
+                ctx.fill();
+
+                // attack glow
+                if (p.attackTimer > 0) {
+                    ctx.strokeStyle = '#fff9b0';
+                    ctx.lineWidth = 6;
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = '#ffd966';
+                    ctx.beginPath();
+                    ctx.roundRect(p.x-4, p.y-4, p.w+8, p.h+8, 20);
+                    ctx.stroke();
+                }
+
+                // belt / details
+                ctx.fillStyle = lightColor;
+                ctx.beginPath();
+                ctx.roundRect(p.x+6, p.y+p.h-16, p.w-12, 8, 10);
+                ctx.fill();
+                // gloves
+                ctx.fillStyle = '#b57c5a';
+                ctx.beginPath();
+                ctx.ellipse(p.x + (p.face === 1 ? p.w-10 : 10), p.y+50, 12, 10, 0, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // helper canvas rounding
+            CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.moveTo(x + r, y);
+                this.lineTo(x + w - r, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r);
+                this.lineTo(x + w, y + h - r);
+                this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                this.lineTo(x + r, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r);
+                this.lineTo(x, y + r);
+                this.quadraticCurveTo(x, y, x + r, y);
+                return this;
+            };
+
+            // ---------- game loop ----------
+            let lastTimestamp = 0;
+            function gameLoop(now) {
+                if (!lastTimestamp) {
+                    lastTimestamp = now;
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
+                const dt = Math.min(0.05, (now - lastTimestamp) / 1000); // max 50ms step
+                lastTimestamp = now;
+
+                if (gameActive) {
+                    // 1. movement
+                    updateMovement(dt);
+                    // 2. push apart if overlapping
+                    resolveCollision();
+                    // 3. update attack timers
+                    updateTimers(dt);
+                    // 4. process hits (if any active attack)
+                    processHit(p1, p2);
+                    processHit(p2, p1);
+                    // 5. edge win condition
+                    checkVictory();
+                }
+
+                // always draw
+                drawScene();
+
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ---------- EVENT LISTENERS ----------
+            window.addEventListener('keydown', (e) => {
+                const code = e.code;
+                // prevent scrolling / page actions
+                const preventKeys = ['KeyA', 'KeyD', 'KeyF', 'ArrowLeft', 'ArrowRight', 'ArrowDown'];
+                if (preventKeys.includes(code) || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                }
+
+                // PLAYER 1 movement
+                if (code === 'KeyA') { key.p1Left = true; }
+                if (code === 'KeyD') { key.p1Right = true; }
+
+                // PLAYER 2 movement
+                if (code === 'ArrowLeft') { key.p2Left = true; }
+                if (code === 'ArrowRight') { key.p2Right = true; }
+
+                // ATTACKS (with single-fire control)
+                if (code === 'KeyF') {
+                    if (!key.p1Attack) {   // avoid holding repeater
+                        key.p1Attack = true;
+                        tryAttack(p1, p2, 1);
+                    }
+                }
+                if (code === 'ArrowDown') {
+                    if (!key.p2Attack) {
+                        key.p2Attack = true;
+                        tryAttack(p2, p1, 2);
+                    }
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const code = e.code;
+                if (code === 'KeyA') { key.p1Left = false; }
+                if (code === 'KeyD') { key.p1Right = false; }
+                if (code === 'ArrowLeft') { key.p2Left = false; }
+                if (code === 'ArrowRight') { key.p2Right = false; }
+                if (code === 'KeyF') { key.p1Attack = false; }
+                if (code === 'ArrowDown') { key.p2Attack = false; }
+                e.preventDefault();
+            });
+
+            // prevent page moving with arrows (additional)
+            window.addEventListener('keydown', (e) => {
+                if (e.key.startsWith('Arrow') || e.code === 'KeyF' || e.code === 'KeyA' || e.code === 'KeyD') {
+                    e.preventDefault();
+                }
+            }, {passive: false});
+
+            // reset button
+            document.getElementById('resetButton').addEventListener('click', () => {
+                resetFight();
+            });
+
+            // start the loop
+            resetFight();   // ensure fresh start
+            requestAnimationFrame(gameLoop);
+        })();
+    </script>
+</body>
+</html>
